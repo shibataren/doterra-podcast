@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>doTERRA Deep Dive Podcast</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .active-transcript {
+            background-color: #e0e7ff;
+            border-left: 4px solid #6366f1;
+            transform: scale(1.02);
+            transition: all 0.3s ease;
+        }
+
+        .transcript-item {
+            transition: all 0.3s ease;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c7c7c7; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+        
+        .blob {
+            position: absolute;
+            filter: blur(40px);
+            z-index: -1;
+            opacity: 0.4;
+        }
+
+        .episode-card.active {
+            border-color: #6366f1;
+            background-color: #eef2ff;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden relative">
+
+    <!-- Background Decoration -->
+    <div class="blob bg-purple-300 w-64 h-64 rounded-full top-0 left-0 mix-blend-multiply animate-pulse"></div>
+    <div class="blob bg-green-300 w-64 h-64 rounded-full bottom-0 right-0 mix-blend-multiply animate-pulse" style="animation-delay: 2s;"></div>
+
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur-md shadow-sm p-4 z-10">
+        <div class="max-w-3xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0">
+                    <i data-lucide="mic" class="w-6 h-6"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <h1 class="font-bold text-gray-800 text-lg leading-tight truncate">Essential Audio Guide</h1>
+                    <button id="episodeListBtn" class="flex items-center gap-1 text-xs text-indigo-600 font-bold hover:underline">
+                        <span id="currentEpTitle">Ep.1: doTERRAの世界を知る</span>
+                        <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            </div>
+            <button id="settingsBtn" class="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100 transition">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content (Transcript) -->
+    <main class="flex-1 overflow-y-auto p-4 scroll-smooth" id="transcriptContainer">
+        <div class="max-w-3xl mx-auto space-y-6 pb-24" id="scriptContent">
+            <!-- Content will be injected here by JS -->
+        </div>
+    </main>
+
+    <!-- Player Controls -->
+    <footer class="bg-white border-t border-gray-200 p-4 pb-6 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <div class="max-w-3xl mx-auto">
+            <!-- Progress Bar -->
+            <div class="w-full bg-gray-200 rounded-full h-1.5 mb-4 cursor-pointer group" id="progressBarContainer">
+                <div class="bg-indigo-600 h-1.5 rounded-full w-0 transition-all duration-300 relative group-hover:h-2" id="progressBar">
+                    <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-indigo-600 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <div class="text-xs text-gray-400 font-mono w-12" id="currentTime">00:00</div>
+                
+                <div class="flex items-center gap-4 md:gap-6">
+                    <button id="rewindBtn" class="text-gray-400 hover:text-gray-700 transition">
+                        <i data-lucide="rewind" class="w-6 h-6"></i>
+                    </button>
+                    
+                    <button id="playBtn" class="w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-lg transition transform hover:scale-105 active:scale-95">
+                        <i data-lucide="play" class="w-6 h-6 ml-1" id="playIcon"></i>
+                    </button>
+                    
+                    <button id="forwardBtn" class="text-gray-400 hover:text-gray-700 transition">
+                        <i data-lucide="fast-forward" class="w-6 h-6"></i>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button id="speedBtn" class="text-xs font-bold text-gray-500 border border-gray-300 rounded px-2 py-1 hover:bg-gray-100 transition w-12">1.0x</button>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Episode List Modal -->
+    <div id="episodeModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-end md:items-center justify-center p-0 md:p-4">
+        <div class="bg-white rounded-t-2xl md:rounded-2xl w-full max-w-md p-6 shadow-2xl h-[80vh] md:h-auto flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">エピソード一覧</h3>
+                <button id="closeEpisodeList" class="p-1 hover:bg-gray-100 rounded-full">
+                    <i data-lucide="x" class="w-5 h-5 text-gray-500"></i>
+                </button>
+            </div>
+            <div class="overflow-y-auto flex-1 space-y-3" id="episodeListContainer">
+                <!-- Episodes injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 class="font-bold text-lg mb-4">設定</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-2">読み上げ音声</label>
+                    <select id="voiceSelect" class="w-full border rounded-lg p-2 text-sm bg-gray-50"></select>
+                </div>
+                <p class="text-xs text-gray-400">※お使いのブラウザやOSによって利用可能な音声が異なります。</p>
+            </div>
+            <button id="closeSettings" class="mt-6 w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition">閉じる</button>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Episode Data
+        const episodes = [
+            {
+                id: 1,
+                title: "Ep.1: doTERRAの世界を知る",
+                description: "ドテラの意味、CPTG品質基準、コ・インパクトソーシングについて学びます。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "こんにちは。エッセンシャル・オーディオガイドへようこそ。今日は、エッセンシャルオイル業界で世界的に有名な企業、「ドテラ（doTERRA）」について深掘りしていきます。ナビゲーターのハルカです。" },
+                    { speaker: "Expert", role: "guest", text: "解説を担当します、アロマセラピストのケンジです。よろしくお願いします。" },
+                    { speaker: "Navigator", role: "host", text: "早速ですが、ドテラという名前、よく耳にしますが、どういう意味なんでしょうか？" },
+                    { speaker: "Expert", role: "guest", text: "はい。ドテラはラテン語で「地球からの贈り物」という意味なんです。2008年にアメリカのユタ州で設立されました。創業当時から、「純粋な天然のエッセンシャルオイルを通して、世界中の人々の健康に貢献したい」というミッションを掲げています。" },
+                    { speaker: "Navigator", role: "host", text: "地球からの贈り物、素敵な名前ですね。でも、エッセンシャルオイルって色々な会社が出していますよね。ドテラの最大の特徴は何ですか？" },
+                    { speaker: "Expert", role: "guest", text: "一番の特徴は、品質基準へのこだわりです。ドテラは「CPTG（シー・ピー・ティ・ジー）」という独自の品質基準を設けています。" },
+                    { speaker: "Navigator", role: "host", text: "CPTG？それはどういうものですか？" },
+                    { speaker: "Expert", role: "guest", text: "Certified Pure Tested Gradeの略で、日本語では「認定純粋セラピー等級」と訳されます。市場にあるエッセンシャルオイルの中には、不純物が混ざっていたり、合成成分が添加されているものも少なくありません。CPTGは、増量剤や人工原材料を一切含まず、農薬などの残留物がないことを、厳格な検査で保証する基準なんです。" },
+                    { speaker: "Navigator", role: "host", text: "なるほど。純度が高いからこそ、安心して使えるわけですね。香りの良さ以外にも、ドテラが支持される理由はありますか？" },
+                    { speaker: "Expert", role: "guest", text: "はい。「コ・インパクト・ソーシング」という調達方法も重要です。これは、発展途上国の生産者と長期的なパートナーシップを結び、公正な賃金の支払いや技術指導を行う取り組みです。" },
+                    { speaker: "Navigator", role: "host", text: "単に原料を買うだけでなく、生産者の生活も支援しているんですね。" },
+                    { speaker: "Expert", role: "guest", text: "その通りです。良い土壌と、大切に育てる生産者がいて初めて、高品質なオイルが生まれるという考え方ですね。また、ヒーリングハンズという慈善活動も行っていて、学校や水道の建設なども支援しています。" },
+                    { speaker: "Navigator", role: "host", text: "企業の背景が見えてきました。では、初心者におすすめのドテラのオイルをいくつか教えてください。" },
+                    { speaker: "Expert", role: "guest", text: "まずは定番の「ラベンダー」ですね。リラックスしたい時に最適です。次に「レモン」。これは気分をリフレッシュさせるだけでなく、お掃除にも使えます。そしてドテラならではのブレンドオイル、「オンガード」も外せません。" },
+                    { speaker: "Navigator", role: "host", text: "オンガード、よく聞きますね！どんな香りなんですか？" },
+                    { speaker: "Expert", role: "guest", text: "オレンジ、クローブ、シナモンなどがブレンドされていて、少しスパイシーで温かみのある香りです。季節の変わり目や、負けない体づくりをサポートする「守りのブレンド」として人気があります。" },
+                    { speaker: "Navigator", role: "host", text: "スパイシーな香り、元気が出そうです。使い方は、香りを楽しむ以外にもあるんですか？" },
+                    { speaker: "Expert", role: "guest", text: "はい。ドテラのオイルは純度が高いため、製品によっては食品添加物として認可されており、飲み物に入れたり料理に使ったりできるものもあります。ただ、必ずボトルの表示を確認し、正しい知識を持って使うことが大切です。" },
+                    { speaker: "Navigator", role: "host", text: "「摂取できるオイルがある」というのは驚きですね。最後に、ドテラについてもっと知りたい方はどうすればいいでしょうか。" },
+                    { speaker: "Expert", role: "guest", text: "ドテラは紹介制の販売形態、いわゆるMLM（マルチレベルマーケティング）を採用しています。身近に使っている会員の方から話を聞くか、公式サイトで情報を確認するのが一番です。まずは香りを体験してみることから始めてみてください。" },
+                    { speaker: "Navigator", role: "host", text: "ありがとうございました。今日はドテラの歴史、品質、そして想いについて学びました。皆さんの生活に、地球からの贈り物をプラスしてみてはいかがでしょうか。それでは、また次回の放送でお会いしましょう。" }
+                ]
+            },
+            {
+                id: 2,
+                title: "Ep.2: エッセンシャルオイルの科学",
+                description: "植物から一滴のオイルになるまでの抽出法と、なぜそれがパワフルなのかを科学的に解説します。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "こんにちは。第2回のエッセンシャル・オーディオガイドです。今回は少し専門的な「科学」の部分に触れていきたいと思います。" },
+                    { speaker: "Expert", role: "guest", text: "アロマセラピストのケンジです。科学と聞くと難しく感じるかもしれませんが、エッセンシャルオイルがなぜ効くのかを知る上でとても面白い部分ですよ。" },
+                    { speaker: "Navigator", role: "host", text: "そもそも、エッセンシャルオイルはどうやって植物から抽出されるんですか？" },
+                    { speaker: "Expert", role: "guest", text: "主に2つの方法があります。一つは「水蒸気蒸留法」。ラベンダーやペパーミントなど多くの植物に使われます。蒸気の熱で植物の香り成分を気化させ、それを冷やしてオイルと水に分離させる方法です。" },
+                    { speaker: "Navigator", role: "host", text: "理科の実験みたいですね。もう一つは？" },
+                    { speaker: "Expert", role: "guest", text: "「低温圧搾法」、コールドプレスとも呼ばれます。これは主に柑橘系に使われます。果皮を物理的に圧迫してオイルを絞り出す方法です。熱を加えないので、フレッシュな香りがそのまま残るのが特徴です。" },
+                    { speaker: "Navigator", role: "host", text: "なるほど。そうやって集められたオイルは、植物そのものよりもパワフルなんですか？" },
+                    { speaker: "Expert", role: "guest", text: "非常にパワフルです。エッセンシャルオイルは植物の有効成分が50倍から70倍に濃縮されています。例えば、ペパーミントオイル1滴は、ペパーミントティー約28杯分に相当すると言われています。" },
+                    { speaker: "Navigator", role: "host", text: "28杯分！それはすごい濃縮度ですね。" },
+                    { speaker: "Expert", role: "guest", text: "はい。だからこそ、少量で大きな働きをしますし、品質が重要なんです。ドテラのオイルはガスクロマトグラフィーや質量分析など、何段階もの検査を経て、その化学組成が適切かどうかをチェックしています。" },
+                    { speaker: "Navigator", role: "host", text: "化学組成、というと？" },
+                    { speaker: "Expert", role: "guest", text: "例えば、リナロールやメントールといった成分のことです。これらが適切なバランスで含まれているからこそ、リラックス効果やリフレッシュ効果が期待できるんです。天然のものなので収穫年によって多少の変動はありますが、CPTG基準によって一定の働きが保証されています。" },
+                    { speaker: "Navigator", role: "host", text: "科学的な裏付けがあるからこそ、安心して使えるんですね。次回は、このパワフルなオイルを日常でどう使うか聞いていきたいと思います。" }
+                ]
+            },
+            {
+                id: 3,
+                title: "Ep.3: 毎日の生活に取り入れるヒント",
+                description: "掃除、洗濯、睡眠など、日々の家事や生活シーンでの具体的な活用法を紹介します。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "エッセンシャル・オーディオガイド、第3回です。今回は、実際にどうやって生活に取り入れるか、具体的な活用法を教えてください。" },
+                    { speaker: "Expert", role: "guest", text: "はい。難しく考える必要はありません。まずは「香りを楽しむ」ことからステップアップして、「家事に使う」のがおすすめです。" },
+                    { speaker: "Navigator", role: "host", text: "家事ですか？例えば掃除とか？" },
+                    { speaker: "Expert", role: "guest", text: "そうです。スプレーボトルに水と、レモンやティーツリーのオイルを数滴入れるだけで、素晴らしい拭き掃除スプレーになります。これらは清潔に保つ働きがあり、香りも良いので掃除が楽しくなりますよ。" },
+                    { speaker: "Navigator", role: "host", text: "市販の洗剤の化学的な匂いが苦手な人には良さそうですね。" },
+                    { speaker: "Expert", role: "guest", text: "まさにそうです。また、洗濯のすすぎの時にラベンダーを1滴垂らすと、部屋干しの嫌な匂いを抑えて、乾いた時にふんわり香ります。" },
+                    { speaker: "Navigator", role: "host", text: "素敵！すぐに試せそうです。他にはどんなシーンで使えますか？" },
+                    { speaker: "Expert", role: "guest", text: "朝起きた時に、コップ一杯の水にレモンオイルを1滴垂らして飲むのも人気です。内側からシャキッとしますよ。ただし、これはドテラの食品認可されているオイルだからできることです。" },
+                    { speaker: "Navigator", role: "host", text: "1日のスタートに良さそうですね。逆に夜はどうでしょう？" },
+                    { speaker: "Expert", role: "guest", text: "夜はやはりディフューズですね。ディフューザーがなければ、ティッシュにラベンダーや「セレニティー（ウェーブリズム）」というブレンドオイルを垂らして枕元に置くだけでもOKです。良い香りは、休息モードへの切り替えスイッチになります。" },
+                    { speaker: "Navigator", role: "host", text: "特別な道具がなくても始められるんですね。私も今夜から枕元に置いてみます。" }
+                ]
+            },
+            {
+                id: 4,
+                title: "Ep.4: 香りで整えるメンタルケア",
+                description: "香りが脳に届くメカニズムと、感情コントロール（エモーショナルアロマ）について。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "第4回です。今日は「感情と香り」について。香りを嗅ぐと、昔の記憶が蘇ったり、急に落ち着いたりすることってありますよね。" },
+                    { speaker: "Expert", role: "guest", text: "はい、それには脳の仕組みが関係しています。五感の中で嗅覚だけが、感情や記憶をつかさどる「大脳辺縁系」にダイレクトに伝わるんです。" },
+                    { speaker: "Navigator", role: "host", text: "ダイレクトに、というのは？" },
+                    { speaker: "Expert", role: "guest", text: "視覚や聴覚は一度理性を司る部分を経由して処理されますが、嗅覚は本能的な部分に0.2秒以下で届くと言われています。つまり、理屈で考える前に、香りが感情をシフトさせてくれるんです。" },
+                    { speaker: "Navigator", role: "host", text: "すごいスピードですね。では、イライラしている時や落ち込んでいる時に香りが助けになるんですね。" },
+                    { speaker: "Expert", role: "guest", text: "その通りです。ドテラには「感情のオイル」と呼ばれるシリーズがあります。例えば、元気が欲しい時は柑橘系の入った「チアー」、心を落ち着けたい時は木の香りの「ピース」などがおすすめです。" },
+                    { speaker: "Navigator", role: "host", text: "自分の今の気分に合わせて選べばいいんですね。" },
+                    { speaker: "Expert", role: "guest", text: "はい。また、「アダプティブ」というブレンドオイルも現代人におすすめです。これはストレスがかかる状況に適応するために開発された香りで、緊張をほぐしつつ、集中力を高めてくれるような絶妙なバランスなんです。" },
+                    { speaker: "Navigator", role: "host", text: "忙しい毎日にぴったりですね。香りを味方につければ、自分の機嫌を自分で取れそうです。" }
+                ]
+            },
+            {
+                id: 5,
+                title: "Ep.5: ナチュラル・スキンケアの極意",
+                description: "フランキンセンスやココナッツオイルを使った、自然派美容法について。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "第5回は、女性なら特に気になる「美容とスキンケア」です。エッセンシャルオイルは肌にも良いんですか？" },
+                    { speaker: "Expert", role: "guest", text: "はい、非常に役立ちます。ただし、エッセンシャルオイルは原液だと刺激が強い場合があるので、キャリアオイルと呼ばれる植物油で希釈して使うのが基本です。" },
+                    { speaker: "Navigator", role: "host", text: "ドテラにもキャリアオイルはあるんですか？" },
+                    { speaker: "Expert", role: "guest", text: "「ココナッツオイル」があります。ドテラのものは分留（ぶんりゅう）といって、固まる成分を取り除いているので、サラッとしていてベタつかず、すぐに肌に馴染みます。" },
+                    { speaker: "Navigator", role: "host", text: "使いやすそうですね。美容におすすめのオイルといえば？" },
+                    { speaker: "Expert", role: "guest", text: "やはり「フランキンセンス」ですね。エッセンシャルオイルの王様と呼ばれています。肌のターンオーバーをサポートし、ハリやツヤを与えてくれます。いつもの化粧水やクリームに1滴混ぜるだけで、高級美容液のような使い心地になりますよ。" },
+                    { speaker: "Navigator", role: "host", text: "王様、試してみたいです！他にはありますか？" },
+                    { speaker: "Expert", role: "guest", text: "肌トラブルが気になる時は「ティーツリー」や「ラベンダー」を。また、「サルベル（イモルテール）」という美容ブレンドは、エイジングケアに特化した貴重なオイルが集められています。" },
+                    { speaker: "Navigator", role: "host", text: "自分でブレンドして、オリジナルの美容オイルを作るのも楽しそうですね。" },
+                    { speaker: "Expert", role: "guest", text: "そうですね。自然の恵みでお肌をケアすると、肌本来の力が引き出される感覚があります。ぜひ毎日のスキンケアに取り入れてみてください。" }
+                ]
+            },
+            {
+                id: 6,
+                title: "Ep.6: ヒーリングハンズと社会貢献",
+                description: "ドテラが世界で行っている支援活動や、サステナビリティへの取り組みについて。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "最終回の第6回です。今回は、製品そのものではなく、ドテラの活動そのもの、特に社会貢献についてお聞きしたいです。" },
+                    { speaker: "Expert", role: "guest", text: "はい。ドテラを語る上で欠かせないのが「ヒーリングハンズ」という慈善活動です。ドテラはオイルを販売するだけでなく、世界中の恵まれない地域を支援する活動を続けています。" },
+                    { speaker: "Navigator", role: "host", text: "具体的にはどんなことをしているんですか？" },
+                    { speaker: "Expert", role: "guest", text: "例えば、エッセンシャルオイルの原料の多くは発展途上国で生産されています。ドテラはそこに学校や病院を建てたり、安全な水道を引いたりしています。人身売買の被害者を救済する活動も支援しています。" },
+                    { speaker: "Navigator", role: "host", text: "私たちがオイルを使うことが、間接的にそういった支援につながるんですね。" },
+                    { speaker: "Expert", role: "guest", text: "その通りです。ボトルの向こう側に、生産者の笑顔や、子供たちの未来がある。そう考えると、一滴のオイルがより大切に思えてきませんか？" },
+                    { speaker: "Navigator", role: "host", text: "本当にそうですね。ただ香りを楽しむだけじゃなく、世界と繋がっている感覚があります。" },
+                    { speaker: "Expert", role: "guest", text: "ドテラのミッションは「一度に一滴、一人、一つのコミュニティを変える」ことです。このポッドキャストを通して、ドテラの世界観に共感していただけたら嬉しいです。" },
+                    { speaker: "Navigator", role: "host", text: "全6回にわたり、ありがとうございました。これからもエッセンシャルオイルのある生活を楽しみたいと思います。" },
+                    { speaker: "Expert", role: "guest", text: "ありがとうございました。" }
+                ]
+            },
+            {
+                id: 7,
+                title: "Ep.7: 基本の「き」：LRPと会員メリット",
+                description: "最もお得にドテラ製品を使い続けるための「LRP（ロイヤルティー・リワード・プログラム）」の仕組みを解説。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "第7回へようこそ。ここからは少しステップアップして、ドテラを「お得に、賢く」楽しむ方法についてお話しします。ケンジさん、LRPってよく聞きますが、何のことですか？" },
+                    { speaker: "Expert", role: "guest", text: "LRPは「ロイヤルティー・リワード・プログラム」の略で、簡単に言うと定期購入プログラムのことです。毎月好きな製品を注文することで、購入額に応じてポイントが貯まっていくんです。" },
+                    { speaker: "Navigator", role: "host", text: "ポイントカードみたいなものですか？" },
+                    { speaker: "Expert", role: "guest", text: "そうですね。でも還元率がすごいんです。最初は10%からスタートして、継続すると最大30%まで上がります。つまり、1万円買ったら3000円分のポイントが返ってくる計算になります。" },
+                    { speaker: "Navigator", role: "host", text: "30%は大きいですね！貯まったポイントはどうなるんですか？" },
+                    { speaker: "Expert", role: "guest", text: "お好きな製品と交換できます。実質、製品を無料で手に入れられるわけです。さらに、毎月15日までに125PV（ポイントボリューム）以上購入すると、「プロダクト・オブ・ザ・マンス」といって、月替わりのプレゼントオイルがもらえます。" },
+                    { speaker: "Navigator", role: "host", text: "無料でもらえるんですか？それは嬉しいですね。でも、毎月買わないといけないのは大変じゃないですか？" },
+                    { speaker: "Expert", role: "guest", text: "実は、注文内容は毎月自由に変えられますし、最低購入額の決まりも緩やかです。洗剤やシャンプーなどの日用品も揃っているので、普段ドラッグストアで買っているものをドテラに切り替えるだけで、自然とポイントが貯まっていきますよ。" },
+                    { speaker: "Navigator", role: "host", text: "なるほど、日用品のブランドチェンジと考えれば効率的ですね。" },
+                    { speaker: "Expert", role: "guest", text: "はい。ドテラを長く愛用するなら、LRPを使わない手はありません。まずは自分のライフスタイルに合わせて、無理なく始めてみるのがおすすめです。" }
+                ]
+            },
+            {
+                id: 8,
+                title: "Ep.8: シェアの第一歩：自然な紹介のコツ",
+                description: "「売り込み」ではなく「分かち合い」。友人や家族にドテラを自然に紹介するためのマインドセットと方法。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "第8回です。製品を気に入ると、誰かに教えたくなりますよね。でも、MLM特有の「勧誘」と思われないか心配という声も聞きます。" },
+                    { speaker: "Expert", role: "guest", text: "その気持ち、よくわかります。大切なのは「売り込む」のではなく、自分が体験した感動を「シェア（分かち合う）」するというマインドです。" },
+                    { speaker: "Navigator", role: "host", text: "シェア、ですか。具体的にはどうすればいいんでしょう？" },
+                    { speaker: "Expert", role: "guest", text: "まずは自分が製品を大好きになり、使いこなすことです。そして、困っている友人がいたら「私はこれを使って良かったよ」と、解決策の一つとして提案するんです。例えば、眠れない友人にラベンダーを少し分けてあげるとか。" },
+                    { speaker: "Navigator", role: "host", text: "なるほど、サンプルをあげるんですね。" },
+                    { speaker: "Expert", role: "guest", text: "はい。「サンプリング」は非常に効果的です。言葉で説明するより、実際の香りを嗅いだり、使ってみる体験の方が何倍も説得力があります。小さな小瓶に入れて「試してみて」と渡すのが、最も自然で親切なアプローチです。" },
+                    { speaker: "Navigator", role: "host", text: "それなら押し付けがましくないですね。" },
+                    { speaker: "Expert", role: "guest", text: "相手が興味を持ったら、詳しい使い方を教えたり、ワークショップに誘ったりすればいいんです。焦らず、相手のタイミングを尊重することが、長く良い関係を続ける秘訣ですよ。" },
+                    { speaker: "Navigator", role: "host", text: "「相手の役に立ちたい」という気持ちがベースにあれば、自然と伝わりそうですね。" }
+                ]
+            },
+            {
+                id: 9,
+                title: "Ep.9: ビジネスとしてのドテラ：報酬プランの基礎",
+                description: "活動が収入につながる仕組み。「ファストスタート」「パワーオブスリー」「ユニレベル」の3つのボーナスを解説。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "第9回は、少しビジネスライクな話になります。「報酬プラン」についてです。ドテラを仕事にしたい人にとって、どうやって収入が発生するのかは重要ですよね。" },
+                    { speaker: "Expert", role: "guest", text: "はい。ドテラの報酬プランは公平で、努力が報われるように設計されています。大きく分けて3つのボーナスを覚えておくと良いでしょう。" },
+                    { speaker: "Navigator", role: "host", text: "3つ、教えてください。" },
+                    { speaker: "Expert", role: "guest", text: "1つ目は「ファストスタート」。これは新規会員を紹介した時に、その方の購入額に応じて最初の60日間支払われるボーナスです。即効性があり、活動の初期段階での励みになります。" },
+                    { speaker: "Navigator", role: "host", text: "最初の手ごたえになるんですね。2つ目は？" },
+                    { speaker: "Expert", role: "guest", text: "「パワーオブスリー」です。これはチーム作りのボーナスです。自分と、直紹介した3人のチームメンバーが一定の条件を満たすと、毎月固定のボーナスが入ります。5,500円、27,500円、165,000円とステップアップしていきます。" },
+                    { speaker: "Navigator", role: "host", text: "チームの結束力がカギなんですね。最後の3つ目は？" },
+                    { speaker: "Expert", role: "guest", text: "「ユニレベル」です。これは長期的な権利収入にあたります。組織が深く大きくなるほど還元率が高くなる仕組みで、時間が経つほど大きな収入源になります。" },
+                    { speaker: "Navigator", role: "host", text: "短期的な収入と、長期的な安定収入が組み合わさっているんですね。" },
+                    { speaker: "Expert", role: "guest", text: "そうです。ただ、最も大切なのは「製品の流通」です。誰も買わないのにマネーゲームのように人が増えるだけでは収入になりません。愛用者を育てることが、ビジネス安定の近道です。" }
+                ]
+            },
+            {
+                id: 10,
+                title: "Ep.10: 成功するチームビルディングと活動の効率化",
+                description: "限られた時間で成果を出すための「PIPES」という考え方と、リーダーとしてのあり方。",
+                script: [
+                    { speaker: "Navigator", role: "host", text: "いよいよ第10回です。今回は、ビジネスとして本格的に取り組む方へ、活動を「効率化」するためのヒントをお願いします。" },
+                    { speaker: "Expert", role: "guest", text: "はい。副業でやられる方も多いので、効率は非常に重要です。ドテラには「PIPES（パイプス）」という成功のためのステップがあります。" },
+                    { speaker: "Navigator", role: "host", text: "パイプス、ですか？" },
+                    { speaker: "Expert", role: "guest", text: "Prepare（準備）、Invite（招待）、Present（伝える）、Enroll（登録）、Support（サポート）の頭文字です。やみくもに動くのではなく、今自分がどの段階にいるのかを意識して、パイプラインをつなげていくイメージです。" },
+                    { speaker: "Navigator", role: "host", text: "なるほど。特に効率化のコツはありますか？" },
+                    { speaker: "Expert", role: "guest", text: "「時間のブロック」をすることです。1日の中で「ドテラ活動をする時間」を明確に決め、その時間はSNS投稿や連絡などに集中する。ダラダラやらないことが大切です。また、自分一人で全部やろうとせず、アップライン（紹介者）やチームの力を借りるのも重要です。" },
+                    { speaker: "Navigator", role: "host", text: "チームビルディングですね。" },
+                    { speaker: "Expert", role: "guest", text: "はい。リーダーの仕事は、自分がスターになることではなく、メンバーが輝けるようにサポートすることです。メンバーの目標を聞き、一緒に計画を立てる。そうして自立したリーダーを育てることが、結果的に自分の時間の自由にもつながります。" },
+                    { speaker: "Navigator", role: "host", text: "お互いに支え合うことで、効率も成果も上がるんですね。" },
+                    { speaker: "Expert", role: "guest", text: "その通りです。焦らず、でも着実に、PIPESを回し続けてみてください。きっと素晴らしいチームができるはずです。" },
+                    { speaker: "Navigator", role: "host", text: "全10回、本当にありがとうございました。ドテラの奥深さと可能性を感じるシリーズでした。" },
+                    { speaker: "Expert", role: "guest", text: "こちらこそ、ありがとうございました。Enjoy doTERRA life!" }
+                ]
+            }
+        ];
+
+        // UI Elements
+        const scriptContainer = document.getElementById('scriptContent');
+        const playBtn = document.getElementById('playBtn');
+        const playIcon = document.getElementById('playIcon');
+        const rewindBtn = document.getElementById('rewindBtn');
+        const forwardBtn = document.getElementById('forwardBtn');
+        const speedBtn = document.getElementById('speedBtn');
+        const progressBar = document.getElementById('progressBar');
+        const currentTimeEl = document.getElementById('currentTime');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsModal = document.getElementById('settingsModal');
+        const closeSettings = document.getElementById('closeSettings');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const episodeListBtn = document.getElementById('episodeListBtn');
+        const episodeModal = document.getElementById('episodeModal');
+        const closeEpisodeList = document.getElementById('closeEpisodeList');
+        const episodeListContainer = document.getElementById('episodeListContainer');
+        const currentEpTitle = document.getElementById('currentEpTitle');
+
+        // State
+        let isPlaying = false;
+        let currentEpIndex = 0; // Index in episodes array
+        let currentScriptIndex = 0; // Index in script array
+        let synthesis = window.speechSynthesis;
+        let utterance = null;
+        let playbackRate = 1.0;
+        let voices = [];
+        let selectedVoice = null;
+        let autoScroll = true;
+
+        // Initialize UI
+        function loadEpisode(epIndex) {
+            stopAudio();
+            currentEpIndex = epIndex;
+            currentScriptIndex = 0;
+            const episode = episodes[epIndex];
+            
+            // Update Title
+            currentEpTitle.textContent = episode.title;
+
+            // Render Script
+            scriptContainer.innerHTML = '';
+            
+            // Add Header Info to Script area
+            const infoDiv = document.createElement('div');
+            infoDiv.className = "mb-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100";
+            infoDiv.innerHTML = `
+                <h2 class="font-bold text-gray-800 text-lg mb-1">${episode.title}</h2>
+                <p class="text-sm text-gray-600">${episode.description}</p>
+            `;
+            scriptContainer.appendChild(infoDiv);
+
+            episode.script.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = `transcript-item p-4 rounded-xl bg-white shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50`;
+                div.dataset.index = index;
+                
+                const roleColor = item.role === 'host' ? 'text-indigo-600' : 'text-emerald-600';
+                const roleName = item.role === 'host' ? 'Host (Haruka)' : 'Expert (Kenji)';
+                const icon = item.role === 'host' ? 'mic-2' : 'book-open';
+
+                div.innerHTML = `
+                    <div class="flex items-center gap-2 mb-2">
+                        <i data-lucide="${icon}" class="w-4 h-4 ${roleColor}"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider ${roleColor}">${roleName}</span>
+                    </div>
+                    <p class="text-gray-700 leading-relaxed text-sm md:text-base">${item.text}</p>
+                `;
+                
+                div.addEventListener('click', () => {
+                    stopAudio();
+                    currentScriptIndex = index;
+                    playAudio();
+                });
+
+                scriptContainer.appendChild(div);
+            });
+            lucide.createIcons();
+            
+            // Reset Progress
+            progressBar.style.width = '0%';
+            currentTimeEl.textContent = '00:00';
+            
+            // Update Active in List
+            renderEpisodeList();
+        }
+
+        function renderEpisodeList() {
+            episodeListContainer.innerHTML = '';
+            episodes.forEach((ep, index) => {
+                const div = document.createElement('div');
+                const isActive = index === currentEpIndex;
+                div.className = `episode-card p-3 rounded-xl border cursor-pointer hover:bg-gray-50 transition ${isActive ? 'active' : 'border-gray-200'}`;
+                
+                div.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-bold text-sm text-gray-800">${ep.title}</p>
+                            <p class="text-xs text-gray-500 mt-1 line-clamp-1">${ep.description}</p>
+                        </div>
+                        ${isActive ? '<i data-lucide="bar-chart-2" class="w-5 h-5 text-indigo-600"></i>' : '<i data-lucide="play-circle" class="w-5 h-5 text-gray-300"></i>'}
+                    </div>
+                `;
+                
+                div.addEventListener('click', () => {
+                    loadEpisode(index);
+                    episodeModal.classList.add('hidden');
+                });
+                
+                episodeListContainer.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        // Voice Loading
+        function loadVoices() {
+            voices = synthesis.getVoices();
+            voiceSelect.innerHTML = '';
+            
+            // Filter for Japanese voices
+            const jpVoices = voices.filter(v => v.lang.includes('ja'));
+            const otherVoices = voices.filter(v => !v.lang.includes('ja'));
+            const allVoices = [...jpVoices, ...otherVoices];
+
+            allVoices.forEach(voice => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                voiceSelect.appendChild(option);
+            });
+
+            if (jpVoices.length > 0) {
+                selectedVoice = jpVoices[0];
+                voiceSelect.value = selectedVoice.name;
+            }
+        }
+
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        // Audio Logic
+        function playAudio() {
+            const currentEpisodeScript = episodes[currentEpIndex].script;
+
+            if (currentScriptIndex >= currentEpisodeScript.length) {
+                stopAudio();
+                currentScriptIndex = 0;
+                updateUI();
+                return;
+            }
+
+            if (isPlaying && utterance && !synthesis.paused) {
+                // Logic handles pause elsewhere
+            } else {
+                speakSegment(currentScriptIndex);
+            }
+        }
+
+        function speakSegment(index) {
+            synthesis.cancel(); // Clear queue
+
+            const currentEpisodeScript = episodes[currentEpIndex].script;
+            const item = currentEpisodeScript[index];
+            
+            utterance = new SpeechSynthesisUtterance(item.text);
+            
+            // Apply Settings
+            if (selectedVoice) utterance.voice = selectedVoice;
+            utterance.rate = playbackRate;
+            
+            // Pitch variation
+            if (item.role === 'host') {
+                utterance.pitch = 1.1; 
+            } else {
+                utterance.pitch = 0.9; 
+            }
+
+            utterance.onstart = () => {
+                isPlaying = true;
+                updateUI();
+                highlightScript(index);
+            };
+
+            utterance.onend = () => {
+                currentScriptIndex++;
+                if (currentScriptIndex < currentEpisodeScript.length && isPlaying) {
+                    speakSegment(currentScriptIndex);
+                } else {
+                    if (currentScriptIndex >= currentEpisodeScript.length) {
+                        isPlaying = false;
+                        currentScriptIndex = 0;
+                        updateUI();
+                        scriptContainer.scrollTo({top: 0, behavior: 'smooth'});
+                    }
+                }
+            };
+
+            utterance.onerror = (e) => {
+                console.error('Speech error', e);
+                isPlaying = false;
+                updateUI();
+            };
+
+            synthesis.speak(utterance);
+        }
+
+        function togglePlay() {
+            if (isPlaying) {
+                synthesis.cancel();
+                isPlaying = false;
+            } else {
+                playAudio();
+            }
+            updateUI();
+        }
+
+        function stopAudio() {
+            synthesis.cancel();
+            isPlaying = false;
+            updateUI();
+        }
+
+        function highlightScript(index) {
+            // Remove active class
+            document.querySelectorAll('.transcript-item').forEach(el => {
+                el.classList.remove('active-transcript');
+                el.classList.add('opacity-60'); 
+            });
+
+            // Add active class
+            const activeEl = document.querySelector(`.transcript-item[data-index="${index}"]`);
+            if (activeEl) {
+                activeEl.classList.add('active-transcript');
+                activeEl.classList.remove('opacity-60');
+                
+                if (autoScroll) {
+                    activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+
+            // Update Progress
+            const currentEpisodeScript = episodes[currentEpIndex].script;
+            const progressPercent = ((index) / currentEpisodeScript.length) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+            
+            // Fake time
+            currentTimeEl.textContent = `${String(Math.floor(index/2)).padStart(2, '0')}:${String(index*3 % 60).padStart(2, '0')}`;
+        }
+
+        function updateUI() {
+            if (isPlaying) {
+                playIcon.setAttribute('data-lucide', 'pause');
+            } else {
+                playIcon.setAttribute('data-lucide', 'play');
+            }
+            lucide.createIcons();
+        }
+
+        // Event Listeners
+        playBtn.addEventListener('click', togglePlay);
+        
+        rewindBtn.addEventListener('click', () => {
+            stopAudio();
+            currentScriptIndex = Math.max(0, currentScriptIndex - 1);
+            playAudio();
+        });
+
+        forwardBtn.addEventListener('click', () => {
+            stopAudio();
+            const currentEpisodeScript = episodes[currentEpIndex].script;
+            currentScriptIndex = Math.min(currentEpisodeScript.length - 1, currentScriptIndex + 1);
+            playAudio();
+        });
+
+        speedBtn.addEventListener('click', () => {
+            const speeds = [1.0, 1.25, 1.5, 2.0];
+            let idx = speeds.indexOf(playbackRate);
+            idx = (idx + 1) % speeds.length;
+            playbackRate = speeds[idx];
+            speedBtn.textContent = `${playbackRate}x`;
+            
+            if (isPlaying) {
+                stopAudio();
+                playAudio();
+            }
+        });
+
+        // Settings & Modals
+        settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+        closeSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+        
+        episodeListBtn.addEventListener('click', () => {
+            renderEpisodeList();
+            episodeModal.classList.remove('hidden');
+        });
+        closeEpisodeList.addEventListener('click', () => episodeModal.classList.add('hidden'));
+
+        voiceSelect.addEventListener('change', (e) => {
+            selectedVoice = voices.find(v => v.name === e.target.value);
+            if (isPlaying) {
+                stopAudio();
+                playAudio();
+            }
+        });
+
+        // Initialize
+        loadVoices();
+        loadEpisode(0); // Load Ep 1
+
+    </script>
+</body>
+</html>
